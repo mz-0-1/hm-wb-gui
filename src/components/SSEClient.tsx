@@ -1,19 +1,12 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card";
+import { TerminalJSON } from "@/components/ui/TerminalJSON";
+import { RainbowButton } from "@/components/ui/rainbow-button";
+import { ProcessResult } from '@/types/index';
 
-// Types
 type EmailRecord = {
+  created_at: string | number | Date;
   id: string;
   subject: string;
   body: string;
@@ -24,52 +17,73 @@ type EmailRecord = {
   humanComment?: string;
   hasHumanReview: boolean;
   status: string;
-  created_at: string;
   updated_at: string;
 };
 
-export default function SSEDataDisplay() {
+interface SSEDataDisplayProps {
+  onStartProcess: () => void;
+  loading: boolean;
+  result: ProcessResult | null;  
+}
+
+export default function SSEDataDisplay({
+  onStartProcess,
+  loading,
+  result,
+}: SSEDataDisplayProps) {
   const [records, setRecords] = useState<EmailRecord[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<
     "connecting" | "connected" | "disconnected"
   >("disconnected");
   const [error, setError] = useState<string | null>(null);
 
+  // --- SSE setup ---
   const setupSSE = useCallback(() => {
-    console.log("Setting up SSE connection...");
     setConnectionStatus("connecting");
 
     const eventSource = new EventSource("https://54.67.120.86.nip.io/sse");
 
     eventSource.onopen = () => {
-      console.log("SSE connection established successfully");
       setConnectionStatus("connected");
     };
 
     eventSource.onmessage = (event) => {
-      console.log("Raw SSE message received of length:", event.data.length);
       try {
         const data = JSON.parse(event.data);
+
+        // 1) INITIAL DATA
         if (data.initialData) {
           setRecords(data.initialData);
-        } else if (data.type === "update") {
-          setRecords((prevRecords) =>
-            prevRecords.map((record) =>
-              record.id === data.callId
-                ? {
-                    ...record,
-                    humanClassification: data.humanClassification,
-                    humanComment: data.humanComment,
-                    status: "completed",
-                    updated_at: data.timestamp,
-                  }
-                : record
-            )
-          );
+        }
+        // 2) NEW RECORD
+        else if (data.type === "newRecord") {
+          // Add the new record to the existing array
+          setRecords((prevRecords) => [...prevRecords, data.record]);
+        }
+        // 3) UPDATE RECORD
+        else if (data.type === "updateRecord") {
+          // Update an existing record (or add if it doesn’t exist yet)
+          setRecords((prevRecords) => {
+            const existingIndex = prevRecords.findIndex(
+              (rec) => rec.id === data.record.id
+            );
+
+            if (existingIndex === -1) {
+              // If the record isn't found, add it
+              return [...prevRecords, data.record];
+            } else {
+              // Otherwise, update the existing record
+              const updatedRecords = [...prevRecords];
+              updatedRecords[existingIndex] = {
+                ...prevRecords[existingIndex],
+                ...data.record, // merges incoming changes
+              };
+              return updatedRecords;
+            }
+          });
         }
       } catch (err) {
         console.error("Error processing SSE message:", err);
-        console.error("Raw message that failed:", event.data);
       }
     };
 
@@ -80,7 +94,6 @@ export default function SSEDataDisplay() {
     };
 
     return () => {
-      console.log("Cleaning up SSE connection");
       eventSource.close();
     };
   }, []);
@@ -92,112 +105,84 @@ export default function SSEDataDisplay() {
     };
   }, [setupSSE]);
 
-  // Example function you might attach to a Button
-  async function handleStartProcess() {
-    try {
-      const response = await fetch("https://54.67.120.86.nip.io/process", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-      if (!response.ok) {
-        throw new Error("Error starting process");
-      }
-      const data = await response.json();
-      console.log("Process started successfully:", data);
-    } catch (err) {
-      console.error(err);
-      setError((err as Error).message);
-    }
+  // --- Sort by created_at descending (most recent first) ---
+  const sortedRecords = [...records].sort(
+    (a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
+
+  // --- Transform record for TerminalJSON ---
+  function makeRecordJSON(record: EmailRecord) {
+    return {
+      subject: record.subject,
+      from: record.from,
+      to: record.to,
+      classification: record.classification,
+      humanClassification: record.humanClassification || null,
+      humanComment: record.humanComment || null,
+      status: record.status,
+      id: record.id,
+      created: new Date(record.created_at).toLocaleString(),
+      updated: new Date(record.updated_at).toLocaleString(),
+    };
   }
 
   return (
     <section className="p-4">
-      {/* Header + Connection Status */}
+      {/* Title + Button + Connection Status */}
       <div className="flex justify-between items-center mb-6">
-        <h1 className="scroll-m-20 text-2xl font-bold tracking-tight lg:text-2xl">
-          Real-Time Email Classification Data
-        </h1>
-
+        <div className="flex items-center gap-4">
+          <h1 className="text-2xl font-bold">Human-Layer-Async Webhook Tests</h1>
+          <RainbowButton onClick={onStartProcess} disabled={loading}>
+            {loading ? "Testing..." : "Test Webhook"}
+          </RainbowButton>
+        </div>
         <div className="flex items-center gap-2">
           <span className="text-sm">Webhook Status:</span>
-          <Badge
-            variant={
+          <span
+            className={`px-2 py-1 rounded-full text-sm ${
               connectionStatus === "connected"
-                ? "secondary"
+                ? "bg-green-100 text-green-800"
                 : connectionStatus === "connecting"
-                ? "outline"
-                : "destructive"
-            }
+                ? "bg-yellow-100 text-yellow-800"
+                : "bg-red-100 text-red-800"
+            }`}
           >
             {connectionStatus}
-          </Badge>
+          </span>
         </div>
       </div>
 
-      {/* Error Alert */}
+      {/* If SSE error */}
       {error && (
-        <Alert variant="destructive" className="mb-4">
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
+        </div>
       )}
 
-      {/* Records or Empty State */}
-      {records.length === 0 ? (
-        <div className="text-center py-8 rounded-lg">
-          <p className="text-muted-foreground">No data available.</p>
+      {/* Show webhook response for "Test Webhook" if you want */}
+      {result && (
+        <div className="mb-4">
+          <TerminalJSON
+            data={result}
+            color={result.status?.includes("successfully") ? "green" : "red"}
+          />
+        </div>
+      )}
+
+      {/* Records */}
+      {sortedRecords.length === 0 ? (
+        <div className="text-center py-8 bg-gray-50 dark:bg-zinc-900 rounded-lg">
+          <p className="text-gray-500">No data available.</p>
         </div>
       ) : (
-        <div className="grid gap-4">
-          {records.map((record) => (
-            <Card key={record.id} className="hover:shadow-md transition-shadow">
-              <CardHeader>
-                <CardTitle>{record.subject}</CardTitle>
-                <CardDescription>
-                  Email ID: {record.id}
-                </CardDescription>
-              </CardHeader>
-
-              <CardContent className="grid gap-2 text-sm">
-                <div className="grid grid-cols-2 gap-4">
-                  <p>
-                    <strong>From:</strong> {record.from}
-                  </p>
-                  <p>
-                    <strong>To:</strong> {record.to}
-                  </p>
-                </div>
-                <p>
-                  <strong>Classification:</strong> {record.classification}
-                </p>
-
-                {record.humanClassification && (
-                  <>
-                    <p>
-                      <strong>Human Classification:</strong>{" "}
-                      {record.humanClassification}
-                    </p>
-                    <p>
-                      <strong>Human Comment:</strong> {record.humanComment}
-                    </p>
-                  </>
-                )}
-
-                <div className="mt-2 pt-2 border-t grid grid-cols-2 gap-4 text-muted-foreground">
-                  <p>
-                    <small>Status: {record.status}</small>
-                  </p>
-                  <p>
-                    <small>Created: {new Date(record.created_at).toLocaleString()}</small>
-                  </p>
-                  <p>
-                    <small>Updated: {new Date(record.updated_at).toLocaleString()}</small>
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+        <div className="space-y-4">
+          {sortedRecords.map((record) => (
+            <TerminalJSON
+              key={record.id}
+              data={makeRecordJSON(record)}
+              typingSpeed={30}
+            />
           ))}
         </div>
       )}

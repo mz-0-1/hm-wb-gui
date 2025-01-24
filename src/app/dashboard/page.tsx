@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ModeToggle } from "@/components/mode-toggle";
 import {
@@ -16,45 +17,44 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { useState } from "react";
-import SSEDataDisplay from "@/components/SSEClient"; 
-import { startProcess } from "@/client-api/api";
-import { Button } from "@/components/ui/button";
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
-import { TerminalJSON } from "@/components/ui/TerminalJSON";
+import SSEDataDisplay from "@/components/SSEClient";
 
-interface StartProcessResponse {
+interface ProcessResult {
   status: string;
+  error?: string;  
+
 }
 
-interface StartProcessError {
-  error: string;
+async function startProcess() {
+  const response = await fetch("https://54.67.120.86.nip.io/process", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+  return response.json();
 }
-
-type StartProcessResult = StartProcessResponse | StartProcessError;
 
 export default function Page() {
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<StartProcessResult | null>(null);
+  const [result, setResult] = useState<ProcessResult | null>(null);
 
-  const handleStartProcess = async () => {
+  async function handleStartProcess() {
     setLoading(true);
     try {
       const data = await startProcess();
       setResult(data);
-    } catch (error) {
-      console.error("Process error:", error);
-      setResult({ error: "Failed to start process" });
+    } catch (err) { 
+      console.error(err);  
+      setResult({status: "failed", error: err instanceof Error ? err.message : "Failed to start process" });
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   return (
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center justify-between gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+        <header className="flex h-16 shrink-0 items-center justify-between gap-2">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-2 h-4" />
@@ -62,40 +62,27 @@ export default function Page() {
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
                   <BreadcrumbLink href="#">
-                    Building Your Application
+                    Playground
                   </BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
-                  <BreadcrumbPage>Data Fetching</BreadcrumbPage>
+                  <BreadcrumbPage>Webhook</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
           </div>
-          <div className="pr-4 flex items-center gap-4">
-            {/* ShadCN Mode Toggle */}
+          <div className="pr-4">
             <ModeToggle />
-            {/* ShadCN Button */}
-            <Button 
-              onClick={handleStartProcess} 
-              disabled={loading}
-            >
-              {loading ? "Testing..." : "Test Webhook"}
-            </Button>
           </div>
         </header>
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-          <div className="mb-0">
-          <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-          {/* If `result` is present, show the console JSON */}
-          {result && (
-            <TerminalJSON data={result} typingSpeed={30} />
-          )}
-          </div>
-          </div>
-          <div className="min-h-[100vh] flex-1 rounded-xl bg-muted/50 md:min-h-min p-4">
-            <SSEDataDisplay />
-          </div>
+
+        <div className="flex flex-1 flex-col p-4 pt-0">
+          <SSEDataDisplay
+            onStartProcess={handleStartProcess}
+            loading={loading}
+            result={result}
+          />
         </div>
       </SidebarInset>
     </SidebarProvider>

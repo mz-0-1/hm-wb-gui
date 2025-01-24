@@ -32,6 +32,7 @@ export function NavProjects({
     name: string
     url: string
     icon: LucideIcon
+    newTab?: boolean
   }[]
 }) {
   const { isMobile } = useSidebar()
@@ -43,10 +44,13 @@ export function NavProjects({
         {projects.map((item) => (
           <SidebarMenuItem key={item.name}>
             <SidebarMenuButton asChild>
-              <a href={item.url}>
-                <item.icon />
-                <span>{item.name}</span>
-              </a>
+            <a 
+              href={item.url}
+              target={item.newTab ? "_blank" : undefined}
+              rel={item.newTab ? "noopener noreferrer" : undefined}
+            >
+              <span>{item.name}</span>
+            </a>
             </SidebarMenuButton>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

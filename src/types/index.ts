@@ -10,3 +10,7 @@ export interface DashboardData {
       values: number[]
     }
   }
+
+  export interface ProcessResult {
+    status: string; 
+  }

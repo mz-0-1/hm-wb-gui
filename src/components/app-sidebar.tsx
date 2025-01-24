@@ -38,11 +38,13 @@ const data = {
         },
         {
           title: "API",
-          url: "#",
+          url: "https://www.humanlayer.dev/docs/introduction",
+          newTab: true
         },
         {
           title: "Settings",
-          url: "#",
+          url: "https://github.com/mz-0-1/03-human-review-async/blob/main/readme.md",
+          newTab: true
         },
       ],
     },
@@ -54,6 +56,7 @@ const data = {
         {
           title: "Github",
           url: "https://github.com/mz-0-1/03-human-review-async",
+          newTab: true
         },
       ],
     },
@@ -62,6 +65,7 @@ const data = {
     {
       name: "HumanLayer",
       url: "https://www.humanlayer.dev/",
+      newTab: true,
       icon: Frame,
     },
   ],
