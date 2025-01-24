@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  productionBrowserSourceMaps: false,
+  swcMinify: true,
+  poweredByHeader: false
 };
 
 export default nextConfig;
