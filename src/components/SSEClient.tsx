@@ -51,18 +51,13 @@ export default function SSEDataDisplay({
       try {
         const data = JSON.parse(event.data);
 
-        // 1) INITIAL DATA
         if (data.initialData) {
           setRecords(data.initialData);
         }
-        // 2) NEW RECORD
         else if (data.type === "newRecord") {
-          // Add the new record to the existing array
           setRecords((prevRecords) => [...prevRecords, data.record]);
         }
-        // 3) UPDATE RECORD
         else if (data.type === "update") {
-          // Update an existing record (or add if it doesn’t exist yet)
           setRecords((prevRecords) => {
             const existingIndex = prevRecords.findIndex(
               (rec) => rec.id === data.callId
@@ -184,7 +179,12 @@ export default function SSEDataDisplay({
             <TerminalJSON
               key={record.id}
               data={makeRecordJSON(record)}
-              typingSpeed={30}
+              typingSpeed={20}
+              signature={
+                record.hasHumanReview && record.humanClassification 
+                  ? `Approved by Human`
+                  : null
+              }
             />
           ))}
         </div>
