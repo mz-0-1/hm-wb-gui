@@ -61,22 +61,25 @@ export default function SSEDataDisplay({
           setRecords((prevRecords) => [...prevRecords, data.record]);
         }
         // 3) UPDATE RECORD
-        else if (data.type === "updateRecord") {
+        else if (data.type === "update") {
           // Update an existing record (or add if it doesn’t exist yet)
           setRecords((prevRecords) => {
             const existingIndex = prevRecords.findIndex(
-              (rec) => rec.id === data.record.id
+              (rec) => rec.id === data.callId
             );
 
             if (existingIndex === -1) {
-              // If the record isn't found, add it
-              return [...prevRecords, data.record];
+              // If the record isn't found:
+              console.warn(`Record not found for callId: ${data.callId}`);
+              return prevRecords;
             } else {
               // Otherwise, update the existing record
               const updatedRecords = [...prevRecords];
               updatedRecords[existingIndex] = {
                 ...prevRecords[existingIndex],
-                ...data.record, // merges incoming changes
+                status: "completed", 
+                humanClassification: data.humanClassification,
+                humanComment: data.humanComment
               };
               return updatedRecords;
             }
